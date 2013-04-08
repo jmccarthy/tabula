@@ -4,7 +4,6 @@ require 'cuba/render'
 
 raise Errno::ENOENT, "'./local_settings.rb' could not be found. See README.md for more info." unless File.exists?('./local_settings.rb')
 
-require 'nokogiri'
 require 'digest/sha1'
 require 'json'
 require 'csv'
@@ -13,12 +12,12 @@ require 'resque/status_server'
 require 'resque/job_with_status'
 
 require './tabula_debug.rb'
-require './lib/detect_rulings.rb'
-require './lib/tabula.rb'
-require './lib/parse_xml.rb'
-require './lib/tabula_graph.rb'
+
+require './tabula_extractor/tabula.rb'
+
 require './lib/jobs/analyze_pdf.rb'
 require './lib/jobs/generate_thumbails.rb'
+
 require './local_settings.rb'
 
 Cuba.plugin Cuba::Render
@@ -64,7 +63,7 @@ Cuba.define do
         line.text_elements.sort_by { |t| t.left }
       }
 
-      case req.params['format'] 
+      case req.params['format']
       when 'csv'
         res['Content-Type'] = 'text/csv'
         csv_string = CSV.generate { |csv|
@@ -94,10 +93,8 @@ Cuba.define do
                        page_images: Dir.glob(File.join(document_dir, "document_560_*.png"))
                          .sort_by { |f| f.gsub(/[^\d]/, '').to_i }
                          .map { |f| f.gsub(Dir.pwd + '/static', '') },
-                       pages: File.open(File.join(Dir.pwd,
-                                                  "static/pdfs/#{file_id}/pages.xml")) { |index_file|
-                         Nokogiri::XML(index_file).xpath('//page')
-                       })
+                       pages: Tabula::XML.get_pages(File.join(Settings::DOCUMENTS_BASEPATH,
+                                                               file_id)))
       end
     end
 
