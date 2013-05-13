@@ -497,34 +497,13 @@ Tabula.PDFView = Backbone.View.extend({
       var thumb_width = img.width();
       var thumb_height = img.height();
 
-      var pdf_width = parseInt(img.data('original-width'));
-      var pdf_height = parseInt(img.data('original-height'));
-      var pdf_rotation = parseInt(img.data('rotation'));
-
-      // if rotated, swap width and height
-      if (pdf_rotation == 90 || pdf_rotation == 270) {
-          var tmp = pdf_height;
-          pdf_height = pdf_width;
-          pdf_width = tmp;
-      }
-
-      var scale = (pdf_width / thumb_width);
-
+      var analysis_width = 2048; //determined by the width of image analyzed in `jruby_table_guesser.rb`
+      var scale = ( analysis_width / thumb_width);
 
       $(tableGuesses[imageIndex]).each(function(tableGuessIndex, tableGuess){ 
 
         var my_x2 = tableGuess[0] + tableGuess[2];
         var my_y2 = tableGuess[1] + tableGuess[3];
-
-        // console.log("page: " + imageIndex + 1);
-        // console.log(tableGuess);
-        // console.log(scale);
-        // console.log(my_x2 / scale);
-        // console.log(my_y2 / scale);
-        // console.log("");
-
-        /* nothing is set yet, when race condition manifests */
-        //console.log(tableGuess, imageIndex);
 
         selection = imgAreaSelectAPIObj.createNewSelection( Math.floor(tableGuess[0] / scale), 
                                       Math.floor(tableGuess[1] / scale), 
@@ -534,7 +513,7 @@ Tabula.PDFView = Backbone.View.extend({
         imgAreaSelectAPIObj.update();
 
        
-        //create a red box for this selection.
+        //create a red box on the thumbnail for this selection.
         if(selection){ //selection is undefined if it overlaps an existing selection.
           $('#thumb-' + $(img).attr('id') + " a").append( $('<div class="selection-show" id="selection-show-' + selection.id + '" />').css('display', 'block') );
           var sshow = $('#thumb-' + $(img).attr('id') + ' #selection-show-' + selection.id);
@@ -546,7 +525,6 @@ Tabula.PDFView = Backbone.View.extend({
         }
 
       });
-      //imgAreaSelectAPIObj.createNewSelection(50, 50, 300, 300); //for testing overlaps from API.
       imgAreaSelectAPIObj.setOptions({show: true});
       imgAreaSelectAPIObj.update();
     },

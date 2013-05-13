@@ -172,11 +172,11 @@ Cuba.define do
       FileUtils.cp(req.params['file'][:tempfile].path,
                    File.join(file_path, 'document.pdf'))
 
-      file = File.join(file_path, 'document.pdf')
+      filename = File.join(file_path, 'document.pdf')
 
       # Make sure this is a PDF.
       # TODO: cleaner way to do this without blindly relying on file extension (which we provided)?
-      mime = `file -b --mime-type #{file}`
+      mime = `file -b --mime-type #{filename}`
       if !mime.include? "application/pdf"
         res.write view("upload_error.html",
             :message => "Sorry, the file you uploaded was not detected as a PDF. You must upload a PDF file. <a href='/'>Please try again</a>.")
@@ -184,22 +184,21 @@ Cuba.define do
         # fire off thumbnail and table detection jobs; table detection goes first, since it often takes longer.
         table_detector = DetectTablesJob.create(
           :file_id => file_id,
-          :file => file,
-          :output_dir => file_path
+          :base_path => Settings::DOCUMENTS_BASEPATH
         )
         sm_thumbnail_job = GenerateThumbnailJob.create(
-          :file => file,
+          :file => filename,
           :output_dir => file_path,
           :thumbnail_size => 560
         )
         lg_thumbnail_job = GenerateThumbnailJob.create(
-          :file => file,
+          :file => filename,
           :output_dir => file_path,
           :thumbnail_size => 2048
         )
         upload_id = AnalyzePDFJob.create(
           :file_id => file_id,
-          :file => file,
+          :file => filename,
           :output_dir => file_path,
           :sm_thumbnail_job => sm_thumbnail_job,
           :lg_thumbnail_job => lg_thumbnail_job,

@@ -12,10 +12,8 @@ java_import com.googlecode.javacpp.Pointer
 java_import com.googlecode.javacv.CanvasFrame
 java_import(com.googlecode.javacv.cpp.opencv_core){'Opencv_core'} #lord help us all.
 java_import(com.googlecode.javacv.cpp.opencv_imgproc){'Opencv_imgproc'} #lord help us all.
-
 java_import(com.googlecode.javacv.cpp.opencv_highgui){'Opencv_highgui'}
-java_import com.sun.pdfview.PDFFile #eventually, replace these with another library for generating images.
-java_import com.sun.pdfview.PDFPage
+java_import javax.imageio.ImageIO
 
 #java_import java.awt.geom.Rectangle2D
 #java_import("java.awt.geom.Rectangle2D.Double"){"Rectangle2D_Double"}
@@ -35,74 +33,44 @@ java_import java.util.Comparator;
 # java_import com.googlecode.javacv.cpp.opencv_core.*;
 # java_import com.googlecode.javacv.cpp.opencv_imgproc.*;
 
-module ColumnGuesser
+module TableGuesser
 
-  def ColumnGuesser.find_and_write_rects(filename, output_dir)
+  def TableGuesser.find_and_write_rects(file_id, base_path)
     #writes to JSON the rectangles on each page in the specified PDF.
-    open(File.join(output_dir, "tables.json"), 'w') do |f|
-      f.write( JSON.dump(find_rects(filename).map{|a| a.map{|r| r.dims.map &:to_i }} ))
+    open(File.join(base_path, file_id, "tables.json"), 'w') do |f|
+      f.write( JSON.dump(find_rects(file_id, base_path).map{|a| a.map{|r| r.dims.map &:to_i }} ))
     end
   end
 
-  def ColumnGuesser.find_rects(filename="nbsps.pdf")
+  def TableGuesser.find_rects(file_id, base_path) 
       tunable_threshold = 500;
 
-      raf = RandomAccessFile.new(filename, "r")
-      channel = raf.channel
-      buf = channel.map(MapMode::READ_ONLY, 0, channel.size())
-      newfile = PDFFile.new(buf)
-
-      if newfile.getNumPages == 0
-        puts "not a pdf!"
-        exit
-      end
-      
-      #ArrayList<Integer> cols = new ArrayList<Integer>();
-
-      #int max_pages
       guess_columns_per_page = false
       
       list_of_cols = []
       cols = []
+      
+      #TODO: find a way to make sure all the images have been generated.
+      # 1. loop through some, see if there are any more?
+      # 2. loop through until the thumbnail_generator says it's done?
+      # 3. start this when thumbnails are done. (dumb)
+      # 3. something else?
 
-      # if(ARGV.size > 2)
-      #   if(ARGV[2].include?("indiv"))
-      #     max_pages = 1000000 #a rly big number, chosen arbitrarily.
-      #     guess_columns_per_page = false = true
-      #   else
-      #     #specify the number of pages from which to deduce column values as second argument.
-      #     if(ARGV[2] != "")
-      #       max_pages = Integer.parseInt(ARGV[2])
-      #     else
-      #       max_pages = 5
-      #     end
-      #     guess_columns_per_page = false = false
-      #   end
-      # else
-      #   max_pages = 1000000 #a rly big number, chosen arbitrarily.
-      #   guess_columns_per_page = false = false
-      # end
+      images = Dir[File.join(base_path, file_id, "document_2048_*")]
+      images.sort_by!{|image_path| File.basename(image_path).gsub("document_2048_", "").gsub(".png", "").to_i }
+      STDERR.puts "found #{images.size} pages"
 
-      puts "pages: " + newfile.getNumPages.to_s
-            
       tables = []
 
-      newfile.getNumPages.times do |i|          
-        page_index = i + 1 
-        if newfile.getNumPages > 100
+      images.each_with_index do |image_path, image_index|   
+        if images.size > 100
           STDERR.puts("detecting tables on page #{page_index}")
         end
-        #gotcha: with PDFView, PDF pages are 1-indexed. If you ask for page 0 and then page 1, you'll get the first page twice. So start with index 1.
-        apage = newfile.getPage(page_index, true)
-        box = apage.getPageBox()
-
-        #Note: sometimes calling getWidth() and getHeight() on apage gives the right result; this used to be called on box, in what DF wrote. Does that ever work better?.
-        image = apage.getImage(apage.getWidth().to_i, apage.getHeight().to_i , nil ,nil ,true ,true )
-
-       #   CanvasFrame source = new CanvasFrame("Source");
-       #   source.showImage(image);
+        
+        image = ImageIO.read(java.io.File.new(image_path))
         iplImage = Opencv_core::IplImage.createFrom(image)
-        lines = cvFindLines(iplImage, tunable_threshold, page_index)
+
+        lines = cvFindLines(iplImage, tunable_threshold, file_id + image_index.to_s)
         vertical_lines = lines.select &:vertical?
         horizontal_lines = lines.select &:horizontal?
 
@@ -118,7 +86,7 @@ module ColumnGuesser
           # we might need to give up..
           break if current_try < 10
           
-          lines = cvFindLines(iplImage, current_try, filename + page_index.to_s)
+          lines = cvFindLines(iplImage, current_try, file_id + image_index.to_s)
           vertical_lines = lines.select &:vertical?
           horizontal_lines = lines.select &:horizontal?
           temp_cols = lines.map{|l| l.point1.x}
@@ -189,7 +157,7 @@ module ColumnGuesser
     # public static double euclideanDistance(double x1, double y1, double x2, double y2){
     #   return Math.sqrt(Math.pow((x1 - x2), 2) + Math.pow((y1 - y2), 2));
     # }
-    def ColumnGuesser.cvFindLines(src, threshold, name) 
+    def TableGuesser.cvFindLines(src, threshold, name) 
       # opencv_core.IplImage dst;
       # opencv_core.IplImage colorDst;
 
@@ -233,11 +201,11 @@ module ColumnGuesser
 
 
 
-    def ColumnGuesser.euclideanDistanceHelper(x1, y1, x2, y2)
+    def TableGuesser.euclideanDistanceHelper(x1, y1, x2, y2)
       return Math.sqrt( ((x1 - x2) ** 2) + ((y1 - y2) ** 2) )
     end
 
-    def ColumnGuesser.euclideanDistance(p1, p2)
+    def TableGuesser.euclideanDistance(p1, p2)
       euclideanDistanceHelper(p1.x, p1.y, p2.x, p2.y)
     end
     
@@ -253,14 +221,14 @@ module ColumnGuesser
     # public static String hashRectangle(Rectangle2D.Double r){
     #   return hashAPoint(r.x) + "," + hashAPoint(r.y) + "," + hashAPoint(r.height) + "," + hashAPoint(r.width);
     # }
-    def ColumnGuesser.isUpwardOriented(line, y_value)
+    def TableGuesser.isUpwardOriented(line, y_value)
       #return true if this line is oriented upwards, i.e. if the majority of it's length is above y_value.
       topPoint = line.topmost_endpoint.y
       bottomPoint = line.bottommost_endpoint.y
       return (y_value - topPoint > bottomPoint - y_value);
     end
     
-    def ColumnGuesser.findTables(verticals, horizontals)
+    def TableGuesser.findTables(verticals, horizontals)
       # /*
       #  * Find all the rectangles in the vertical and horizontal lines given.
       #  * 
@@ -412,5 +380,5 @@ module ColumnGuesser
 end
 
 if __FILE__ == $0
-  ColumnGuesser::find_and_write_rects(ARGV[0], ARGV[1])
+  TableGuesser::find_and_write_rects(ARGV[0], ARGV[1])
 end
