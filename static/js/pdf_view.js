@@ -378,7 +378,16 @@ Tabula.PDFView = Backbone.View.extend({
       this.toggleClearAllAndRestorePredetectedTablesButtons(this.total_selections());
     },
 
-    repeat_lassos: function(){ alert("not yet implemented")},
+    repeat_lassos: function(){ 
+      _(imgAreaSelects).each(function(selection) {
+        templateSelection = imgAreaSelects[0].getSelections()[0]
+        
+        if (selection!=templateSelection) {
+          selection.cancelSelections()
+        }
+        selection.createNewSelection(templateSelection.x1,templateSelection.y1,templateSelection.x2,templateSelection.y2)
+      })
+    },
 
     query_all_data : function(){
       all_coords = [];
