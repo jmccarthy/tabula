@@ -1,21 +1,18 @@
+#since war/jar bundle requires gem package; use gem-in-a-box for testing
+#or execute tabula via "rackup".
+#source "http://127.0.0.1:9292"
+
 source "https://rubygems.org"
+platform :jruby do
+  gem "cuba"
+  gem "rack", "~> 1.6.0"
+  gem "tilt", "~> 1.4.0"
 
-group :production do
-  platforms :mri_19, :mri_20 do
-    gem "algorithms"
-    gem "nokogiri"
-    gem "cuba"
-    gem "foreman"
+  group :development do
     gem "rake"
-    gem "resque"
-    gem "resque-progress"
-    gem "resque-status"
-    gem "ruby-opencv"
-  end
-end
-
-group :test do
-  platforms :mri_19, :mri_20 do
-    gem "minitest"
+    gem "warbler", "~> 1.4.9"
+    gem "jruby-jars", "1.7.24"
+    gem "bootstrap-sass", "~> 3.2.0"
+    gem "compass"
   end
 end
